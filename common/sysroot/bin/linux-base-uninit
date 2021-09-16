@@ -1,0 +1,23 @@
+##################################################################
+#Warrant:	GPLv3
+#Author:	gransonwii
+#Mail:		gransonwii@gmail.com
+#Date:		Sun Sep  5 23:14:04 CST 2021
+##################################################################
+. linux-base-list-common
+#Global data
+ARG_PASS=""
+#Do uninit
+arg_test_uninit(){
+    #allow uninit one and more machine
+    [[ $# -gt 1 ]] && ERROR_CODE="$EXIT_LINUX_BASE_UNINIT_HELP" && \
+    err_print "ERROR@$0@${LINENO}L: "${EXIT_INFO[$EXIT_LINUX_BASE_UNINIT_HELP]} && exit "$ERROR_CODE"
+}
+#Tests
+common_test
+arg_test_uninit $*
+#Uninit all or one
+NAME_SEARCH="$INSTALL_PREFIX/$1"
+count_sysroot
+do_uninit
+exit "$EXIT_TRUE"

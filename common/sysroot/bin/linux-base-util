@@ -1,0 +1,89 @@
+##################################################################
+#Warrant:	GPLv3
+#Author:	gransonwii
+#Mail:		gransonwii@gmail.com
+#Date:		Sun Sep  5 23:14:04 CST 2021
+##################################################################
+#----------------------------------------------------------------------------------------------------------
+#Log util
+#----------------------------------------------------------------------------------------------------------
+log_trace(){
+	echo -ne "$(date "+%F,%T")# [TRACE]# $*\n"
+	if [[ $# == 1 ]];then
+		eval "$*"
+	else
+		$*
+	fi
+	return $?
+}
+log_term(){
+	if [[ $# == 1 ]];then
+		info="$(eval $* 2>&1)"
+	else
+		info="$($* 2>&1)"	
+	fi
+	local ret=$?
+	if [[ $ret == 0 ]];then
+		echo -ne "$(date "+%F,%T")# [INFO]# $*\n $info"
+	else
+		echo -ne "$(date "+%F,%T")# [ERROR]# $*\n $info"
+	fi
+	return $ret
+}
+log_print(){
+	local OPTIND=0
+	while getopts e:i: opt 2>&1 1>/dev/null; do
+		case "$opt" in
+			i) echo -ne "$(date "+%F,%T")# [info]: $OPTARG" >&1;;
+			e) echo -ne "$(date "+%F,%T")# [error]: $OPTARG" >&2;;
+			*) ;;
+		esac
+	done
+}
+info_print(){
+	log_print -i "$*"
+}
+err_print(){
+	log_print -e "$*"
+}
+
+#----------------------------------------------------------------------------------------------------------
+#Awk data util
+#----------------------------------------------------------------------------------------------------------
+#if feild not exist,create it
+update_field(){
+    echo "$1" | grep = && return -1
+    awk -v "feild=$1" -v "value=$2" -v "file=$3" 'BEGIN{FS="=";UPDATE="FALSE"}{ \
+        if($1==feild){ \
+            printf "%s=%s\n",$1,value>file; \
+            UPDATE="TRUE"; \
+        } \
+        else \
+        printf "%s\n",$0>file; \
+    } \
+    END{if(UPDATE=="FALSE")printf "%s=%s\n",feild,value>file; \
+    }' \
+    "$3" 2>/dev/null
+}
+select_field(){
+    echo "$1" | grep = && return -1
+    ! awk -v "feild=$1" -v "file=$2" 'BEGIN{FS="="}{ \
+        if($1==feild){ \
+            print $2; \
+            exit 0; \
+        } \
+    } \
+    ' \
+    "$2" 2>/dev/null
+}
+del_field(){
+    echo "$1" | grep = && return -1
+    awk -v "feild=$1" -v "file=$2" 'BEGIN{FS="="}{ \
+        if($1!=feild){ \
+            print $0>file; \
+        } \
+        else {printf "">file;} \
+    } \
+    ' \
+    "$2" 2>/dev/null
+}

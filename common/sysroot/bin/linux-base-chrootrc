@@ -1,0 +1,23 @@
+##################################################################
+#Warrant:	GPLv3
+#Author:	gransonwii
+#Mail:		gransonwii@gmail.com
+#Date:		Sun Sep  5 23:14:04 CST 2021
+##################################################################
+. linux-base-common
+. linux-base-util
+#Arg test
+arg_test_start(){
+    ! [[ $# -eq 1 ]] && ERROR_CODE="$EXIT_LINUX_BASE_CHROOTRC_HELP" && \
+    err_print "ERROR@$0@${LINENO}L: "${EXIT_INFO[$EXIT_LINUX_BASE_CHROOTRC_HELP]} && exit "$ERROR_CODE"
+    START_MACHINE_NAME="$1"
+}
+
+#Arg test
+IFS=$'\x80'
+common_test
+arg_test_start $*
+! linux-base-start "$START_MACHINE_NAME" 'for file in /etc/chroot.init.d/*;do [[ -f "$file" && -x "$file" ]] && sh -c "exec $file &"; done' && \
+ERROR_CODE="$EXIT_LINUX_BASE_START_FAIL" && \
+err_print "ERROR@$0@${LINENO}L: "${EXIT_INFO[$EXIT_LINUX_BASE_START_FAIL]} && exit "$ERROR_CODE"
+exit "$EXIT_TRUE"

@@ -1,0 +1,7 @@
+id=linuxbase_bc86fef53bb3
+name=LinuxAnyWhere
+version=v0.1
+versionCode=1
+author=gransonwii
+description=install chroot runing systems and manage them
+minMagisk=1500

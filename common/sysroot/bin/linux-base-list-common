@@ -1,0 +1,201 @@
+##################################################################
+#Warrant:	GPLv3
+#Author:	gransonwii
+#Mail:		gransonwii@gmail.com
+#Date:		Sun Sep  5 23:14:04 CST 2021
+##################################################################
+. linux-base-common
+. linux-base-util
+#Global data
+CHROOT_LINUX_PATH=()
+CHROOT_LINUX_NAME=()
+CHROOT_LINUX_TYPE=()
+CHROOT_LINUX_INSTALL_TIME=()
+CHROOT_LINUX_LOG_TIME=()
+CHROOT_LINUX_INSTALL_RET=()
+
+NAME_SEARCH="$INSTALL_PREFIX/"
+LINUX_ROOT_ID=""
+
+#Count sys-root
+count_sysroot(){
+    LINUX_ROOT_ID=$(find "$NAME_SEARCH" -maxdepth 2 -name "$INSTALL_ID" 2>/dev/null|awk 'BEGIN{ORS=":"}{print $0}'|sed -e 's/[:]$//g')
+    [[ "$LINUX_ROOT_ID" == "" ]] && ERROR_CODE="$EXIT_NOT_INSTALL_LINUX" && \
+    err_print "ERROR@$0@${LINENO}L: "${EXIT_INFO[$EXIT_NOT_INSTALL_LINUX]} && exit "$ERROR_CODE"
+    NUM_MACHINE=$(echo "$LINUX_ROOT_ID" | awk 'BEGIN{FS=":"}{print NF}')
+    for i in $(seq 0 $((NUM_MACHINE-1)));do
+     CHROOT_LINUX_PATH[$i]="$(echo "$LINUX_ROOT_ID"| awk -v "field=$((i+1))" 'BEGIN{FS=":"}{print $field}' | sed 's#[/][^/]*$##g')"
+     CHROOT_LINUX_NAME[$i]=$(echo "${CHROOT_LINUX_PATH[$i]}" | sed -e 's#^.*/##g')
+     CHROOT_LINUX_TYPE[$i]=$(select_field "$INSTALL_DIS_NAME" "${CHROOT_LINUX_PATH[$i]}/$INSTALL_ID")
+     CHROOT_LINUX_INSTALL_TIME[$i]=$(select_field "$INSTALL_DATE" "${CHROOT_LINUX_PATH[$i]}/$INSTALL_ID")
+     CHROOT_LINUX_LOG_TIME[$i]=$(select_field "$LAST_LOG_TIME" "${CHROOT_LINUX_PATH[$i]}/$INSTALL_ID")
+     CHROOT_LINUX_INSTALL_RET[$i]=$(select_field "$INSTALL_OK_BOOL" "${CHROOT_LINUX_PATH[$i]}/$INSTALL_ID")
+    done
+}
+#Show machine info
+show_info(){
+    show_info_MACHI_ID="$1"
+    if [[ "$show_info_MACHI_ID" != "" ]];then
+        TYPE="" && [[ "${CHROOT_LINUX_TYPE[$i]}" != "" ]] && TYPE="OS: ${CHROOT_LINUX_TYPE[$i]}\n"
+        DATE="" && [[ "${CHROOT_LINUX_INSTALL_TIME[$i]}" != "" ]] && DATE="InsDate: ${CHROOT_LINUX_INSTALL_TIME[$i]}\n"
+        LOG_TIME="" && [[ "${CHROOT_LINUX_LOG_TIME[$i]}" != "" ]] && LOG_TIME="LastLog: ${CHROOT_LINUX_LOG_TIME[$i]}\n"
+        INSTALL_RET="Auto Install OK: No, Manul install?\n" && [[ "${CHROOT_LINUX_INSTALL_RET[$i]}" == "true" ]] && INSTALL_RET="Auto Install OK: Yes\n"
+        echo "$((i+1))"')'" ${CHROOT_LINUX_NAME[$i]}"
+        echo "--------------------------------------------------"
+        echo -en "$TYPE"
+        echo -en "$DATE"
+        echo -en "$LOG_TIME"
+        echo -en "$INSTALL_RET" 
+        echo "--------------------------------------------------"   
+    else
+        ERROR_CODE="$EXIT_LINUX_DIS_ID_NULL" && \
+        echo -en  "WARNING@$0@${LINENO}L: ${EXIT_INFO[$EXIT_LINUX_DIS_ID_NULL]}"
+    fi
+}
+#print list
+do_plist(){
+    ACK=0
+    while ! [[ "$ACK" -ge 1 && "$ACK" -le "$NUM_MACHINE" ]];do
+    echo "=================================================="
+    echo "*[Installed system]"
+    echo "--------------------------------------------------"
+    for i in $(seq 0 $((NUM_MACHINE-1)));do
+        show_info "$i"
+    done
+    echo -en "Which machine would you start[1-$NUM_MACHINE]: "
+    read ACK
+    done
+}
+do_init(){
+    OLDIFS=$IFS && IFS=$':'
+    for ID in $LINUX_ROOT_ID;do
+    CHROOT_LINUX_ROOT="$(echo "$ID" | sed 's#[/][^/]*$##g')"
+    #dis mounts
+    #OS=$(select_field "$INSTALL_DIS_NAME" "$ID")
+    #if [[ "$OS" == "${CANDICATE_DIS[$DIS_CODE_ALPINE]}" ]];then
+    #    true;
+    #elif [[ "$OS" == "${CANDICATE_DIS[$DIS_CODE_ARCHARM]}" ]];then
+	#    true;
+    #elif [[ "$OS" == "${CANDICATE_DIS[$DIS_CODE_UPORT]}" ]];then 
+    #    true;
+    #else 
+    #    true;
+    #fi
+    #common mounts
+	
+    ! mount | grep "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME ">/dev/null 2>/dev/null && ! eval $mount_bind "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME" "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME" 2>/dev/null >/dev/null && \
+    ERROR_CODE="$EXIT_MOUNT_FAILED" && \
+    err_print "ERROR@$0@${LINENO}L: "${EXIT_INFO[$EXIT_MOUNT_FAILED]} && exit "$ERROR_CODE"
+	
+    ! mount | grep "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME/var/cache ">/dev/null 2>/dev/null && ! eval $mount_bind "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME/var/cache" "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME/var/cache" 2>/dev/null >/dev/null && \
+    ERROR_CODE="$EXIT_MOUNT_FAILED" && \
+    err_print "ERROR@$0@${LINENO}L: "${EXIT_INFO[$EXIT_MOUNT_FAILED]} && exit "$ERROR_CODE"
+	if cat /proc/filesystems|grep "proc$" 2>/dev/null >/dev/null; then
+        ! mount | grep "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME/proc ">/dev/null 2>/dev/null && ! mount -t proc proc "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME/proc">/dev/null 2>/dev/null && \
+        ERROR_CODE="$EXIT_MOUNT_FAILED" && \
+        err_print "ERROR@$0@${LINENO}L: "${EXIT_INFO[$EXIT_MOUNT_FAILED]} && exit "$ERROR_CODE"
+	else
+        ! mount | grep "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME/proc ">/dev/null 2>/dev/null && ! eval $mount_bind /proc "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME/proc">/dev/null 2>/dev/null && \
+        ERROR_CODE="$EXIT_MOUNT_FAILED" && \
+        err_print "ERROR@$0@${LINENO}L: "${EXIT_INFO[$EXIT_MOUNT_FAILED]} && exit "$ERROR_CODE"	
+	fi
+	
+	if cat /proc/filesystems|grep "sysfs$" 2>/dev/null >/dev/null; then
+        ! mount | grep "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME/sys ">/dev/null 2>/dev/null && ! mount -t sysfs sysfs "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME/sys">/dev/null 2>/dev/null && \
+        ERROR_CODE="$EXIT_MOUNT_FAILED" && \
+        err_print "ERROR@$0@${LINENO}L: "${EXIT_INFO[$EXIT_MOUNT_FAILED]} && exit "$ERROR_CODE"
+	else
+        ! mount | grep "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME/sys ">/dev/null 2>/dev/null && ! eval $mount_bind /sys "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME/sys">/dev/null 2>/dev/null && \
+        ERROR_CODE="$EXIT_MOUNT_FAILED" && \
+        err_print "ERROR@$0@${LINENO}L: "${EXIT_INFO[$EXIT_MOUNT_FAILED]} && exit "$ERROR_CODE"	
+	fi
+	
+	if cat /proc/filesystems|grep "devtmpfs$" 2>/dev/null >/dev/null; then
+        ! mount | grep "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME/dev ">/dev/null 2>/dev/null && ! mount -t devtmpfs devtmpfs "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME/dev">/dev/null 2>/dev/null && \
+        ERROR_CODE="$EXIT_MOUNT_FAILED" && \
+        err_print "ERROR@$0@${LINENO}L: "${EXIT_INFO[$EXIT_MOUNT_FAILED]} && exit "$ERROR_CODE"
+	else
+        ! mount | grep "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME/dev ">/dev/null 2>/dev/null && ! eval $mount_bind /dev "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME/dev">/dev/null 2>/dev/null && \
+        ERROR_CODE="$EXIT_MOUNT_FAILED" && \
+        err_print "ERROR@$0@${LINENO}L: "${EXIT_INFO[$EXIT_MOUNT_FAILED]} && exit "$ERROR_CODE"	
+	fi
+
+	#set condition false to use host filesystem
+	if false && cat /proc/filesystems|grep "devpts$" 2>/dev/null >/dev/null; then
+        ! mount | grep "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME/dev/pts ">/dev/null 2>/dev/null && { mkdir -p "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME/dev/pts"; ! mount -t devpts devpts "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME/dev/pts"; }>/dev/null 2>/dev/null && \
+        ERROR_CODE="$EXIT_MOUNT_FAILED" && \
+        err_print "ERROR@$0@${LINENO}L: "${EXIT_INFO[$EXIT_MOUNT_FAILED]} && exit "$ERROR_CODE"
+	else
+        ! mount | grep "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME/dev/pts ">/dev/null 2>/dev/null && { mkdir -p "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME/dev/pts"; ! eval $mount_bind /dev/pts "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME/dev/pts"; }>/dev/null 2>/dev/null && \
+        ERROR_CODE="$EXIT_MOUNT_FAILED" && \
+        err_print "ERROR@$0@${LINENO}L: "${EXIT_INFO[$EXIT_MOUNT_FAILED]} && exit "$ERROR_CODE"
+	fi
+
+	if cat /proc/filesystems|grep "tmpfs$" 2>/dev/null >/dev/null; then
+        ! mount | grep "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME/run ">/dev/null 2>/dev/null && ! mount -t tmpfs tmpfs "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME/run">/dev/null 2>/dev/null && \
+        ERROR_CODE="$EXIT_MOUNT_FAILED" && \
+        err_print "ERROR@$0@${LINENO}L: "${EXIT_INFO[$EXIT_MOUNT_FAILED]} && exit "$ERROR_CODE"
+	else
+        ! mount | grep "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME/run ">/dev/null 2>/dev/null && ! eval $mount_bind /run "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME/run">/dev/null 2>/dev/null && \
+        ERROR_CODE="$EXIT_MOUNT_FAILED" && \
+        err_print "ERROR@$0@${LINENO}L: "${EXIT_INFO[$EXIT_MOUNT_FAILED]} && exit "$ERROR_CODE"	
+	fi
+	
+	if cat /proc/filesystems|grep "tmpfs$" 2>/dev/null >/dev/null; then
+        ! mount | grep "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME/tmp ">/dev/null 2>/dev/null && ! mount -t tmpfs tmpfs "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME/tmp">/dev/null 2>/dev/null && \
+        ERROR_CODE="$EXIT_MOUNT_FAILED" && \
+        err_print "ERROR@$0@${LINENO}L: "${EXIT_INFO[$EXIT_MOUNT_FAILED]} && exit "$ERROR_CODE"
+	else
+        ! mount | grep "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME/tmp ">/dev/null 2>/dev/null && ! eval $mount_bind /tmp "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME/tmp">/dev/null 2>/dev/null && \
+        ERROR_CODE="$EXIT_MOUNT_FAILED" && \
+        err_print "ERROR@$0@${LINENO}L: "${EXIT_INFO[$EXIT_MOUNT_FAILED]} && exit "$ERROR_CODE"	
+	fi
+	
+    done;
+    IFS=$OLDIFS
+}
+do_uninit(){
+    OLDIFS=$IFS && IFS=$':'
+    for ID in $LINUX_ROOT_ID;do
+    CHROOT_LINUX_ROOT="$(echo "$ID" | sed 's#[/][^/]*$##g')"
+    #common mounts
+    if [[ false ]];then
+    mount | grep "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME/run ">/dev/null 2>/dev/null && ! umount -l "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME/run">/dev/null 2>/dev/null && \
+    ERROR_CODE="$EXIT_UMOUNT_FAILED" && \
+    err_print "ERROR@$0@${LINENO}L: "${EXIT_INFO[$EXIT_UMOUNT_FAILED]} && exit "$ERROR_CODE"
+    mount | grep "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME/tmp ">/dev/null 2>/dev/null && ! umount -l "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME/tmp">/dev/null 2>/dev/null && \
+    ERROR_CODE="$EXIT_UMOUNT_FAILED" && \
+    err_print "ERROR@$0@${LINENO}L: "${EXIT_INFO[$EXIT_UMOUNT_FAILED]} && exit "$ERROR_CODE"
+    mount | grep "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME/proc ">/dev/null 2>/dev/null && ! umount -l "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME/proc">/dev/null 2>/dev/null && \
+    ERROR_CODE="$EXIT_UMOUNT_FAILED" && \
+    err_print "ERROR@$0@${LINENO}L: "${EXIT_INFO[$EXIT_UMOUNT_FAILED]} && exit "$ERROR_CODE"
+    mount | grep "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME/sys ">/dev/null 2>/dev/null && ! umount -l "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME/sys">/dev/null 2>/dev/null && \
+    ERROR_CODE="$EXIT_UMOUNT_FAILED" && \
+    err_print "ERROR@$0@${LINENO}L: "${EXIT_INFO[$EXIT_UMOUNT_FAILED]} && exit "$ERROR_CODE"
+    mount | grep "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME/dev/pts ">/dev/null 2>/dev/null && ! umount -l "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME/dev/pts">/dev/null 2>/dev/null && \
+    ERROR_CODE="$EXIT_UMOUNT_FAILED" && \
+    err_print "ERROR@$0@${LINENO}L: "@$CHROOT_LINUX_ROOT${EXIT_INFO[$EXIT_UMOUNT_FAILED]} && exit "$ERROR_CODE"    
+    mount | grep "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME/dev ">/dev/null 2>/dev/null && ! umount -l "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME/dev">/dev/null 2>/dev/null && \
+    ERROR_CODE="$EXIT_UMOUNT_FAILED" && \
+    err_print "ERROR@$0@${LINENO}L: "${EXIT_INFO[$EXIT_UMOUNT_FAILED]} && exit "$ERROR_CODE"
+    mount | grep "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME/var/cache ">/dev/null 2>/dev/null && ! umount -l "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME/var/cache">/dev/null 2>/dev/null && \
+    ERROR_CODE="$EXIT_UMOUNT_FAILED" && \
+    err_print "ERROR@$0@${LINENO}L: "${EXIT_INFO[$EXIT_UMOUNT_FAILED]} && exit "$ERROR_CODE"
+    fi
+    mount | grep "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME ">/dev/null 2>/dev/null && ! umount -l "$CHROOT_LINUX_ROOT/$SYS_ROOT_NAME">/dev/null 2>/dev/null && \
+    ERROR_CODE="$EXIT_UMOUNT_FAILED" && \
+    err_print "ERROR@$0@${LINENO}L: "${EXIT_INFO[$EXIT_UMOUNT_FAILED]} && exit "$ERROR_CODE"
+    #dis mounts
+    #OS=$(select_field "$INSTALL_DIS_NAME" "$ID")
+    #if [[ "$OS" == "${CANDICATE_DIS[$DIS_CODE_ALPINE]}" ]];then
+    #    true;
+    #elif [[ "$OS" == "${CANDICATE_DIS[$DIS_CODE_ARCHARM]}" ]];then
+    #    true;
+    #elif [[ "$OS" == "${CANDICATE_DIS[$DIS_CODE_UPORT]}" ]];then
+    #    true;
+    #else 
+    #    true;
+    #fi
+    done;
+    IFS=$OLDIFS
+}

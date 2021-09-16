@@ -1,0 +1,137 @@
+##################################################################
+#Warrant:	GPLv3
+#Author:	gransonwii
+#Mail:		gransonwii@gmail.com
+#Date:		Sun Sep  5 23:14:04 CST 2021
+##################################################################
+#----------------------------------------------------------------------------------------------------------
+#Platform define 
+#----------------------------------------------------------------------------------------------------------
+if [[ -f /system/build.prop ]];then
+    readonly mount_bind='mount'
+    readonly INSTALL_PREFIX="/data"
+    readonly INSTALL_TMP="$INSTALL_PREFIX/local/tmp"
+    readonly INSTALL_SEARCH_PATH="/sdcard"
+else
+    readonly mount_bind='mount -B'
+    readonly INSTALL_PREFIX="/usr/local"
+    readonly INSTALL_TMP="/tmp"
+    readonly INSTALL_SEARCH_PATH="~"
+fi
+readonly IPT_SH_PATH="#!/bin/sh"
+#----------------------------------------------------------------------------------------------------------
+#Debug Info
+#----------------------------------------------------------------------------------------------------------
+
+ERROR_CODE_START=0
+EXIT_TRUE="$ERROR_CODE_START" && let "ERROR_CODE_START++"
+EXIT_BUSYBOX_NOT_INSTALL="$ERROR_CODE_START" && let "ERROR_CODE_START++"
+EXIT_MOUNT_FAILED="$ERROR_CODE_START" && let "ERROR_CODE_START++"
+EXIT_UMOUNT_FAILED="$ERROR_CODE_START" && let "ERROR_CODE_START++"
+EXIT_NOT_RUN_ROOT="$ERROR_CODE_START" && let "ERROR_CODE_START++"
+EXIT_NOT_INSTALL_LINUX="$ERROR_CODE_START" && let "ERROR_CODE_START++"
+EXIT_DATA_NOT_MOUNT_RW="$ERROR_CODE_START" && let "ERROR_CODE_START++"
+EXIT_ARG_HELP="$ERROR_CODE_START" && let "ERROR_CODE_START++"
+EXIT_INIT_FALIED="$ERROR_CODE_START" && let "ERROR_CODE_START++"
+EXIT_CHROOT="$ERROR_CODE_START" && let "ERROR_CODE_START++"
+EXIT_LINUX_BASE_INIT_HELP="$ERROR_CODE_START" && let "ERROR_CODE_START++"
+EXIT_LINUX_BASE_UNINIT_HELP="$ERROR_CODE_START" && let "ERROR_CODE_START++"
+EXIT_LINUX_BASE_START_HELP="$ERROR_CODE_START" && let "ERROR_CODE_START++"
+EXIT_LINUX_DIS_ID_NULL="$ERROR_CODE_START" && let "ERROR_CODE_START++"
+EXIT_MKDIR_FALIED="$ERROR_CODE_START" && let "ERROR_CODE_START++"
+EXIT_DECOMPRESS_FALIED="$ERROR_CODE_START" && let "ERROR_CODE_START++"
+EXIT_FETCH_FALIED="$ERROR_CODE_START" && let "ERROR_CODE_START++"
+EXIT_LINUX_BASE_CHROOTRC_HELP="$ERROR_CODE_START" && let "ERROR_CODE_START++" 
+EXIT_LINUX_BASE_START_FAIL="$ERROR_CODE_START" && let "ERROR_CODE_START++"
+
+EXIT_INFO[$EXIT_TRUE]=''
+EXIT_INFO[$EXIT_BUSYBOX_NOT_INSTALL]='Please install busybox and try again!\n'
+EXIT_INFO[$EXIT_MOUNT_FAILED]='mount sys failed!\n'
+EXIT_INFO[$EXIT_UMOUNT_FAILED]='Umount sys failed!\n'
+EXIT_INFO[$EXIT_NOT_RUN_ROOT]='Please run in superuser!\n'
+EXIT_INFO[$EXIT_NOT_INSTALL_LINUX]='Please install linux and try again!\n'
+EXIT_INFO[$EXIT_DATA_NOT_MOUNT_RW]='Remount data rw failed!\n'
+EXIT_INFO[$EXIT_ARG_HELP]="$0: ist all machine"'!\n'
+EXIT_INFO[$EXIT_INIT_FALIED]="Init failed"'!\n'
+EXIT_INFO[$EXIT_CHROOT]="Chroot failed"'!\n'
+EXIT_INFO[$EXIT_LINUX_BASE_INIT_HELP]="Usage:$0 <machine>"'!\n'
+EXIT_INFO[$EXIT_LINUX_BASE_UNINIT_HELP]="Usage:$0 <machine>,default:machine=ALL"'!\n'
+EXIT_INFO[$EXIT_LINUX_BASE_START_HELP]="Usage:$0 <machine> [exec path]"'!\n'
+EXIT_INFO[$EXIT_LINUX_DIS_ID_NULL]='Machine not found'
+EXIT_INFO[$EXIT_MKDIR_FALIED]='Make sys dir failed!'
+EXIT_INFO[$EXIT_DECOMPRESS_FALIED]='Decompress file failed!'
+EXIT_INFO[$EXIT_FETCH_FALIED]='get install file failed!'
+EXIT_INFO[$EXIT_LINUX_BASE_CHROOTRC_HELP]="Usage:$0 <machine>"'!\n'
+EXIT_INFO[$EXIT_LINUX_BASE_START_FAIL]='Machine start failed!'
+
+#----------------------------------------------------------------------------------------------------------
+#Const data
+#----------------------------------------------------------------------------------------------------------
+readonly INSTALLER_NAME="rsmanager"
+readonly INSTALLER_VER="v1.0.0"
+readonly INSTALL_ID="50da6c6b3afe416182c427b5a2aab0bc"
+readonly SYS_ROOT_NAME="rootfs"
+readonly LOGIN_FILE="/bin/chroot_exec"
+readonly CHROOTRC_DIR="/etc/chroot.init.d"
+readonly TERM_TYPE="terminator"
+#readonly SYS_TMP="/tmp"
+#----------------------------------------------------------------------------------------------------------
+#Linux dis list
+#----------------------------------------------------------------------------------------------------------
+#DISC_CODE MULTI MAP KEY
+DIS_CODE_START=0
+DIS_CODE_ALPINE="$DIS_CODE_START" && let "DIS_CODE_START++"
+DIS_CODE_ARCHARM="$DIS_CODE_START" && let "DIS_CODE_START++"
+DIS_CODE_UPORT="$DIS_CODE_START" && let "DIS_CODE_START++"
+#Add a new Dis
+DIS_CODE_NEW="$DIS_CODE_START" && let "DIS_CODE_START++"
+#Any dis in the end of map
+DIS_CODE_ANY="$DIS_CODE_START" && let "DIS_CODE_START++"
+#CANDICATE_DIS MAP
+CANDICATE_DIS[$DIS_CODE_ALPINE]="alpine"
+CANDICATE_DIS[$DIS_CODE_UPORT]="ubuntu-ports"
+CANDICATE_DIS[$DIS_CODE_ARCHARM]="archlinuxarm"
+CANDICATE_DIS[$DIS_CODE_ANY]="unkownlinux"
+#Get DIS ID
+get_dis_id(){
+    get_dis_id_name="$1"
+    for get_dis_id_DIS_ID in $(seq 1 ${#CANDICATE_DIS[@]});do
+        [[ ${CANDICATE_DIS[$(get_dis_id_DIS_ID-1)]} == "$get_dis_id_name" ]] &&\
+        echo "$get_dis_id_DIS_ID" && break
+    done
+}
+#Add a new Dis
+CANDICATE_DIS[$DIS_CODE_NEW]=""
+
+#DIS_DEF_URL MAP
+DIS_DEF_URL[$DIS_CODE_ALPINE]='http://mirrors.tuna.tsinghua.edu.cn/alpine/v3.12/releases/${ARCH}/alpine-minirootfs-3.12.3-${ARCH}.tar.gz'
+DIS_DEF_URL[$DIS_CODE_UPORT]='http://mirrors.tuna.tsinghua.edu.cn/ubuntu-cdimage/ubuntu-base/releases/16.04.6/release/ubuntu-base-16.04.6-base-${ARCH}.tar.gz'
+DIS_DEF_URL[$DIS_CODE_ARCHARM]='http://mirrors.tuna.tsinghua.edu.cn/archlinuxarm/os/ArchLinuxARM-${ARCH}-latest.tar.gz'
+DIS_DEF_URL[$DIS_CODE_ANY]=''
+#NOT MAP DATA
+ALPINE_SOURCE='dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn'
+PAC_SOURCE='Server = https://mirrors.tuna.tsinghua.edu.cn/archlinuxarm/$arch/$repo'
+#Linux DNS list
+CANDICATE_DNS=("1.2.4.8" "1.1.1.1" "8.8.8.8" "114.114.114.114")
+#----------------------------------------------------------------------------------------------------------
+#Machine info fileds
+#----------------------------------------------------------------------------------------------------------
+INSTALL_DIS_NAME="os"
+INSTALL_HOST_ARCH="arch"
+INSTALL_DATE="date"
+INSTALL_OK_BOOL="install_ok"
+LAST_LOG_TIME="log_time"
+#----------------------------------------------------------------------------------------------------------
+#Common test
+#----------------------------------------------------------------------------------------------------------
+common_test(){
+    ! busybox true>/dev/null 2>/dev/null && ERROR_CODE="$EXIT_BUSYBOX_NOT_INSTALL" && \
+    err_print "ERROR@$0@${LINENO}L: "${EXIT_INFO[$EXIT_BUSYBOX_NOT_INSTALL]} && exit "$ERROR_CODE"
+
+    USER=$(id -u)
+    [[ "$USER" != "0" ]] && ERROR_CODE="$EXIT_NOT_RUN_ROOT" && \
+    err_print "ERROR@$0@${LINENO}L: "${EXIT_INFO[$EXIT_NOT_RUN_ROOT]} && exit "$ERROR_CODE"
+
+    [[ "$INSTALL_PREFIX" == "/data" &&  -f /system/build.prop ]] && ! mount -o rw,remount /data>/dev/null 2>/dev/null && ERROR_CODE="$EXIT_DATA_NOT_MOUNT_RW" && \
+    err_print "ERROR@$0@${LINENO}L: "${EXIT_INFO[$EXIT_DATA_NOT_MOUNT_RW]} && exit "$ERROR_CODE"
+}

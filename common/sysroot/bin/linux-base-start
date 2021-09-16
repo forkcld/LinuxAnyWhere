@@ -1,0 +1,38 @@
+##################################################################
+#Warrant:	GPLv3
+#Author:	gransonwii
+#Mail:		gransonwii@gmail.com
+#Date:		Sun Sep  5 23:14:04 CST 2021
+##################################################################
+. linux-base-list-common
+. linux-base-util
+#Global data
+START_MACHINE_NAME=""
+#Arg test
+arg_test_start(){
+    ! [[ $# -ge 1 && $# -le 2 ]] && ERROR_CODE="$EXIT_LINUX_BASE_START_HELP" && \
+    err_print "ERROR@$0@${LINENO}L: "${EXIT_INFO[$EXIT_LINUX_BASE_START_HELP]} && exit "$ERROR_CODE"
+    START_MACHINE_NAME="$1"
+    USR_LOGIN_FILE="$LOGIN_FILE"
+}
+
+#Arg test
+IFS=$'\x80'
+common_test
+arg_test_start $*
+#Init and show
+NAME_SEARCH="$INSTALL_PREFIX/$1/"
+count_sysroot
+do_init
+[[ $# -eq 1 ]] && show_info 0
+
+#Update log time and login
+update_field "$LAST_LOG_TIME" "$(date '+%T %m/%d-%Y')" "$INSTALL_PREFIX/$START_MACHINE_NAME/$INSTALL_ID"
+CH_ARGS="$2"
+! chroot "$INSTALL_PREFIX/$START_MACHINE_NAME/$SYS_ROOT_NAME" "$USR_LOGIN_FILE" $CH_ARGS && ERROR_CODE="$EXIT_DATA_NOT_MOUNT_RW" && \
+err_print "ERROR@$0@${LINENO}L: ${EXIT_INFO[$EXIT_CHROOT]}" && exit "$ERROR_CODE"
+
+#Umount when logout, depracate since add chrootrc sevices depend on sys mount point
+#! [[ $# -eq 2 ]] && linux-base-uninit "$START_MACHINE_NAME" 2>/dev/null
+
+exit "$EXIT_TRUE"
